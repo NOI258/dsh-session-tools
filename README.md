@@ -78,6 +78,20 @@ node check-md.cjs AGENTS.md --yaml-end=END_OF_CONFIG
 
 ## 装
 
+从 npm（发布后）：
+
+```bash
+npm i -g @noi258/dsh-session-tools
+# 三个命令：dsh-export-session / dsh-index-sessions / dsh-check-md
+```
+
+或者直接 clone：
+
+```bash
+git clone https://github.com/NOI258/dsh-session-tools
+cd dsh-session-tools && node test/run-tests.mjs
+```
+
 Node 18+。前两个零依赖。
 
 `check-md.cjs` 要 `yaml`：
@@ -104,12 +118,30 @@ Android 版本、SoC 型号、整机容量在容器里查不到（没有 `getpro
 
 三个脚本只用 Node 标准库，`check-md.cjs` 额外需要 `yaml`。这不是硬性要求，只说明「实际验证过的组合」：Node 18+ 理论上都能跑，但只有上面那套是实测过的。
 
-## 不做的部分
+## 不足
 
-- 不管内容好不好。`check-md.cjs` 只能说文件坏没坏，说不了规则写得对不对。
-- 检查项是照我的文件格式写的。你的结构不一样就得改分段规则。
-- 没测试框架。验证靠手搓样本。
-- 跟 DSH 事件流的字段名绑着（`user/message`、`session/title` 这些）。格式变了要跟着改。
+按影响排序。详细维护说明见 [MAINTENANCE.md](./MAINTENANCE.md)。
+
+**1. 索引脚本有两份，会分叉**
+仓库里的 `index-sessions.cjs` 和本机实际在用的 `~/.dsh/sessions/scan-sessions.cjs` 是两个独立实现，互不引用。后者功能是子集（没有 `--out`、没有文件版本选择、合并键没有首问），但多了硬编码 TOPIC、当前会话标记、项目分片分类。改了这边忘了那边，就会出现在 INDEX 里写 25 轮、导出写 23 轮的情况——2026-11-27 踩过一次。合并方案写在 MAINTENANCE 里，会改动现有 INDEX 结构所以还没做。
+
+**2. `check-md.cjs` 的分段规则是特化的**
+它认「第一个顶层 `key:` 行开始，到独立 `---` 或全大写裸行结束」。文件结构不一样就得改规则。它判得了「格式坏没坏」，判不了「内容对不对」。
+
+**3. 跟 DSH 事件流的字段名绑死**
+依赖 `user/message`、`assistant/message`、`session`、`session/title`、`data.source.kind`、`data.message.content`。DSH 改格式就得跟着改，没有适配层。多帧 zstd 的解码也是照当前格式写的。
+
+**4. 索引只在本地扫目录**
+不认远端会话，不增量更新，每次全量扫。会话多了会变慢（实测几十个目录在手机上是几秒级）。
+
+**5. 导出大会话很吃 context**
+导 200+ 轮的会话是几万 token。所以顺序应该是：先看 INDEX（零成本）→ 要摘要读 `resume-*.md` → 要具体某段才导出全文再 grep，别整份读。
+
+**6. 时间跨度取文件顺序的首尾事件，不是时间戳 min/max**（未确认风险）
+`f0`/`l0` 按事件顺序取第一个/最后一个时间。文件顺序若被打乱，跨度会显示成反的。实测的真实会话都是单调的，所以没改；要改成 min/max 只是两行的事。
+
+**7. 测试是手搓的，不是框架**
+`test/run-tests.mjs` 造临时数据、起子进程、读输出断言。够用，但加用例要重复样板代码，也没有 coverage 统计。
 
 ---
 

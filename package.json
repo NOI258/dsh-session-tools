@@ -1,0 +1,48 @@
+{
+  "name": "@noi258/dsh-session-tools",
+  "version": "0.1.0",
+  "description": "DSH 会话工具：把 zstd 事件流导出成可读对话、生成会话索引、校验「YAML 主体 + Markdown 附录」格式的文件",
+  "private": false,
+  "type": "commonjs",
+  "bin": {
+    "dsh-export-session": "./export-session.mjs",
+    "dsh-index-sessions": "./index-sessions.cjs",
+    "dsh-check-md": "./check-md.cjs"
+  },
+  "files": [
+    "export-session.mjs",
+    "index-sessions.cjs",
+    "check-md.cjs",
+    "README.md",
+    "MAINTENANCE.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "yaml": "^2.4.0"
+  },
+  "scripts": {
+    "test": "node test/run-tests.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "session",
+    "export",
+    "markdown",
+    "zstd",
+    "cli"
+  ],
+  "author": "NOI258",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NOI258/dsh-session-tools.git"
+  },
+  "bugs": {
+    "url": "https://github.com/NOI258/dsh-session-tools/issues"
+  },
+  "homepage": "https://github.com/NOI258/dsh-session-tools#readme"
+}

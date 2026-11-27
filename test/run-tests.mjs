@@ -7,7 +7,8 @@
  *
  *   1. index-sessions: 短会话合并键要带上首问，同标题同轮数的两件事不能合并
  *   2. export-session: 正文里未闭合的代码围栏不能吞掉后续轮次
- *   3. check-md: 显式 --yaml-end 找不到时必须报分段错误，不能回退到默认规则
+ *   3. export-session: 空正文的用户消息不占轮号，头部轮数与 USER 边界数一致
+ *   4. check-md: 显式 --yaml-end 找不到时必须报分段错误，不能回退到默认规则
  *
  * 用法: node test/run-tests.mjs
  * 退出码: 0 全过 / 1 有失败
@@ -108,7 +109,40 @@ try {
     check('export: 退出码 0', r.code === 0, `exit ${r.code}`)
   }
 
-  // ---------- 3. check-md 结束标记 ----------
+  // ---------- 3. export 轮数一致性 ----------
+  // 空正文的用户消息（只有工具块或纯空白）过去会让 turn 先自增再跳过，
+  // 结果头部轮数比实际写出的 USER 边界多，轮号还会跳号。
+  {
+    const dir = join(work, 'exports', 'session-eee00005')
+    await mkdir(dir, { recursive: true })
+    const now = Date.now()
+    const userMsg = (t, text) => ({ type: 'user/message', time: t, data: { source: { kind: 'user' }, content: [{ type: 'text', text }] } })
+    const asstMsg = (t, text) => ({ type: 'assistant/message', time: t, data: { message: { content: [{ type: 'text', text }] } } })
+    const events = [
+      { type: 'session', createdAt: now, cwd: '/root/workspace' },
+      userMsg(now, 'first question'),
+      asstMsg(now, 'first answer'),
+      // 空正文：真实会话里确实存在（用户只发了附件/只有工具块）
+      { type: 'user/message', time: now + 1, data: { source: { kind: 'user' }, content: [] } },
+      asstMsg(now + 1, 'answer to empty turn'),
+      userMsg(now + 2, 'second question'),
+      asstMsg(now + 2, 'second answer'),
+    ]
+    await writeFile(join(dir, 'session.v4.jsonl.zstd'), zstdCompressSync(Buffer.from(events.map(e => JSON.stringify(e)).join('\n') + '\n')))
+    const out = join(work, 'dialog-turns.md')
+    const r = run(exportScript, [dir, out])
+    const md = await readFile(out, 'utf8').catch(() => '')
+    const userBounds = (md.match(/^===== USER #/gm) ?? []).length
+    const declared = Number((md.match(/^- 对话轮数：(\d+)/m) ?? [])[1])
+    const nums = [...md.matchAll(/^===== USER #(\d+)/gm)].map(m => Number(m[1]))
+    check('export: 头部轮数等于实际写出的 USER 边界数', declared === userBounds, `头部 ${declared} / 实际 ${userBounds}`)
+    check('export: 空正文消息不占轮号', declared === 2, `头部 ${declared}（应为 2）`)
+    check('export: 轮号连续不跳号', nums.join(',') === '1,2', `轮号: ${nums.join(',') || '(无)'}`)
+    check('export: 空正文轮次之后的正文仍然保留', md.includes('answer to empty turn') && md.includes('second answer'), '')
+    check('export: 退出码 0', r.code === 0, `exit ${r.code}`)
+  }
+
+  // ---------- 4. check-md 结束标记 ----------
   {
     const good = join(work, 'good.md')
     await writeFile(good, 'name: test\nbody:\n  # 这里提到 END 不算边界\n  a: 1\nEND\n# Markdown 区\n')

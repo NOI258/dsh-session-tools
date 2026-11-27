@@ -110,10 +110,12 @@ for (const o of objs) {
 
   if (o.type === 'user/message') {
     if (o.data?.source?.kind !== 'user') continue;      // 跳过系统注入
-    turn++;
     const body = (o.data?.content || [])
       .filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    // 空正文的消息（只有工具块或纯空白）不占轮号。先自增再跳过会让 turn 跑在
+    // 实际写出的轮次边界前面：头部「对话轮数」比 '^===== USER' 行数多，轮号还跳。
     if (!body) continue;
+    turn++;
     out.push(`\n===== USER #${turn} · ${fmtTime(o.time)} =====\n${fencedBlock(body)}`);
   }
 

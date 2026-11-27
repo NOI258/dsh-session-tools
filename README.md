@@ -166,4 +166,4 @@ YAML_MODULE=/path/to/node_modules/yaml node check-md.cjs AGENTS.md
 
 ---
 
-MIT
+MIT © 2026 NOI258

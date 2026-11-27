@@ -1,6 +1,6 @@
 # dsh-session-tools
 
-> 最后更新：2026-11-27
+> 最后更新：2026-11-27 22:38 · 版本 v0.1.0（tag 在 `5ad98ef`）· 本轮：README 补时间戳与版本行
 
 DSH 把每个会话存成 zstd 压缩的 JSONL 事件流，扔在 `~/.dsh/sessions/` 下，没有查看工具。
 

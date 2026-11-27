@@ -1,0 +1,4 @@
+node_modules/
+*.log
+dialog-*.md
+INDEX.md

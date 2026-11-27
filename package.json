@@ -7,12 +7,15 @@
   "bin": {
     "dsh-export-session": "./export-session.mjs",
     "dsh-index-sessions": "./index-sessions.cjs",
-    "dsh-check-md": "./check-md.cjs"
+    "dsh-check-md": "./check-md.cjs",
+    "dsh-search-sessions": "./search-sessions.mjs"
   },
   "files": [
     "export-session.mjs",
     "index-sessions.cjs",
     "check-md.cjs",
+    "search-sessions.mjs",
+    "lib/session-decode.mjs",
     "README.md",
     "MAINTENANCE.md",
     "LICENSE",
@@ -34,6 +37,8 @@
     "export",
     "markdown",
     "zstd",
+    "search",
+    "grep",
     "cli"
   ],
   "author": "NOI258",

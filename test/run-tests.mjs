@@ -25,6 +25,7 @@ const root = join(here, '..')
 const indexScript = join(root, 'index-sessions.cjs')
 const exportScript = join(root, 'export-session.mjs')
 const checkScript = join(root, 'check-md.cjs')
+const searchScript = join(root, 'search-sessions.mjs')
 
 const results = []
 const check = (name, ok, detail) => {
@@ -224,6 +225,55 @@ try {
     const row = (md.split('## 短会话')[1] ?? '').split('\n').find(l => l.startsWith('| `'))
     const turns = row ? row.split('|')[3].trim() : '(没找到数据行)'
     check('index: 轮数不计空正文用户消息', turns === '2', `轮数: ${turns}（应为 2）`)
+  }
+  // ---------- 7. search-sessions ----------
+  // 关键词是消息级 AND：两个词分在不同消息里不算命中。
+  // 角色过滤和退出码是 grep 语义，无命中必须非 0，否则脚本里没法判断。
+  {
+    const sessions = join(work, 'sessions7')
+    const ws = join(sessions, 'ws')
+    await writeSession(join(ws, 'session-ggg00007'), { title: '搜索测试', turns: 2, first: 'alpha beta 关键词' })
+    const cacheHome = join(work, 'cache7')
+    const env = { ...process.env, XDG_CACHE_HOME: cacheHome }
+    const base = ['--sessions=' + sessions]
+
+    const hit = run(searchScript, ['alpha', ...base], { env })
+    check('search: 关键词命中真人发言', hit.code === 0 && /USER/.test(hit.out), `exit ${hit.code}`)
+
+    const and = run(searchScript, ['alpha', 'answer', ...base], { env })
+    check('search: 两个词分属不同消息不算命中', and.code === 1, `exit ${and.code}`)
+
+    const both = run(searchScript, ['alpha beta', 'alpha', ...base], { env })
+    check('search: 多词同消息同时命中', both.code === 0, `exit ${both.code}`)
+
+    const onlyUser = run(searchScript, ['answer', '--role=user', ...base], { env })
+    check('search: --role=user 过滤掉模型正文', onlyUser.code === 1, `exit ${onlyUser.code}`)
+
+    const onlyAsst = run(searchScript, ['answer', '--role=assistant', ...base], { env })
+    check('search: --role=assistant 能命中模型正文', onlyAsst.code === 0, `exit ${onlyAsst.code}`)
+
+    const limited = run(searchScript, ['answer', '--limit=1', ...base], { env })
+    const shown = (limited.out.match(/^ws|^\S{8}\s+\d{4}-/gm) ?? []).length
+    check('search: --limit 限制显示条数', limited.code === 0, `exit ${limited.code}`)
+
+    const badRole = run(searchScript, ['alpha', '--role=nobody', ...base], { env })
+    check('search: 非法 --role 报用法错误', badRole.code === 2, `exit ${badRole.code}`)
+
+    const missing = run(searchScript, ['zzz-not-there', ...base], { env })
+    check('search: 无命中退出码为 1', missing.code === 1, `exit ${missing.code}`)
+
+    const json = run(searchScript, ['alpha', '--json', ...base], { env })
+    let parsed = null
+    try { parsed = JSON.parse(json.out.trim().split('\n')[0]) } catch { /* 留空 */ }
+    check('search: --json 输出可解析且带字段', parsed?.role === 'USER' && Array.isArray(parsed?.snippets),
+      parsed ? JSON.stringify(Object.keys(parsed)) : '不是合法 JSON')
+
+    // 缓存命中和不命中必须给出同样的结果
+    const cold = run(searchScript, ['alpha', '--no-cache', ...base], { env })
+    const warm = run(searchScript, ['alpha', ...base], { env })
+    const warm2 = run(searchScript, ['alpha', ...base], { env })
+    check('search: 缓存前后结果一致', cold.out === warm.out && warm.out === warm2.out,
+      cold.out === warm.out ? '一致' : '缓存改变了输出')
   }
 } finally {
   await rm(work, { recursive: true, force: true })

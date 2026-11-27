@@ -53,6 +53,25 @@ node check-md.cjs AGENTS.md --yaml-end=END_OF_CONFIG
 
 ---
 
+## search-sessions.mjs
+
+```bash
+node search-sessions.mjs "关键词"
+node search-sessions.mjs Proton --role=user --limit=5
+node search-sessions.mjs --sessions=~/.dsh/sessions "两个词" --json
+```
+
+会话是压在磁盘上的 zstd，`grep` 搜不到。这个脚本解压全部会话，只取真人发言和模型正文（和 `export-session` 同一套规则），按消息级匹配。
+
+- 多个关键词是 **AND**：同一消息里都出现才算命中
+- 默认按时间倒序，最近的先说
+- 选项：`--role=user|assistant|all`、`--limit=<n>`、`--context=<n>`、`--session=<前缀>`、`--json`、`--case`、`--no-cache`
+- 退出码跟 grep 一致：有命中 0，无命中 1，用法错误 2
+
+第一次要解压全部会话（这台机器 49 个会话约 8 秒）。之后正文缓存在 `~/.cache/dsh-session-tools`，按源文件大小 + mtime 失效，第二次起约 0.4 秒；缓存约 1.6 MB（zstd 压缩）。不想写缓存用 `--no-cache`。
+
+---
+
 ## 一个让我改了两次的坑
 
 第一版分段规则是「遇到非法行就结束 YAML 主体」。

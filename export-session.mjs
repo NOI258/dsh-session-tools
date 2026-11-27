@@ -13,48 +13,9 @@
  *   node export-session.mjs ~/.dsh/sessions/--root-workspace--/session-abc123
  *   node export-session.mjs ~/.dsh/sessions/.../session.v4.jsonl.zstd out.md
  */
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { zstdDecompressSync } from 'node:zlib';
+import { readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
-
-const ZSTD_MAGIC = 0x28b52ffd;
-const SKIP_BASE = 0x184d2a50;
-const SKIP_MASK = 0xfffffff0;
-
-/** 解压可能多帧的 zstd 数据 */
-function decodeMultiFrame(buf) {
-  try { return zstdDecompressSync(buf); } catch { /* 走逐帧 */ }
-  const chunks = [];
-  let start = 0, frames = 0;
-  for (let i = 0; i + 4 <= buf.length; i++) {
-    const magic = buf.readUInt32LE(i);
-    if (magic === ZSTD_MAGIC || (magic & SKIP_MASK) === SKIP_BASE) {
-      if (frames > 0) chunks.push(zstdDecompressSync(buf.subarray(start, i)));
-      start = i;
-      frames++;
-    }
-  }
-  if (frames === 0) throw new Error('找不到 zstd 帧');
-  chunks.push(zstdDecompressSync(buf.subarray(start)));
-  return Buffer.concat(chunks);
-}
-
-/** 目录里找事件流文件，不假设固定文件名 */
-function findEventFile(dir) {
-  const candidates = readdirSync(dir)
-    .filter(f => f.endsWith('.jsonl.zstd') || f.endsWith('.jsonl'))
-    .sort();
-  if (!candidates.length) throw new Error(`目录里没有 *.jsonl.zstd: ${dir}`);
-  // 优先带版本号的最新格式。版本号按数值比较：字符串排序会把 v10 排在 v4 前面。
-  const versionOf = (name) => {
-    const m = name.match(/\.v(\d+)\./);
-    return m ? Number(m[1]) : -1;
-  };
-  const versioned = candidates
-    .filter(f => /\.v\d+\./.test(f))
-    .sort((a, b) => versionOf(b) - versionOf(a));
-  return join(dir, (versioned[0] || candidates[0]));
-}
+import { decodeMultiFrame, findEventFile } from './lib/session-decode.mjs';
 
 const input = process.argv[2];
 if (!input) {

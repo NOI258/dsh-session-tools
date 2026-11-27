@@ -275,6 +275,39 @@ try {
     check('search: 缓存前后结果一致', cold.out === warm.out && warm.out === warm2.out,
       cold.out === warm.out ? '一致' : '缓存改变了输出')
   }
+  // ---------- 8. 文档和 package.json 与 bin 数量同步 ----------
+  // 加计新工具时最容易漏的两处：README 开头的「N 个脚本」和 package.json 的 files。
+  // 这两处漏了不会报错，只会在别人 clone 下来时找不到文件、或者看到过时的介绍。
+  {
+    const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+    const files = Object.values(pkg.bin ?? {}).map(b => b.replace(/^\.\//, ''))
+    const readme = await readFile(join(root, 'README.md'), 'utf8')
+    const integ = await readFile(join(root, 'INTEGRATION.md'), 'utf8')
+    const CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+
+    // 只检查「正确数字出现过」是不够的：文档里同一句话会出现三次，
+    // 改一处留两处，旧写法照样通过。所以必须检查「错误数字一次都没出现」。
+    const ALL = CN.slice(1, 11)
+    const wrongIn = (doc) => ALL.filter(n => n !== CN[files.length] && doc.includes(`${n}个脚本`))
+    const wrongReadme = wrongIn(readme)
+    const wrongInteg = wrongIn(integ)
+    check('docs: bin 数量与 README 的「N 个脚本」一致',
+      readme.includes(`${CN[files.length]}个脚本`) && wrongReadme.length === 0,
+      `bin ${files.length} 个；${wrongReadme.length ? `README 里还有「${wrongReadme.join('、')}个脚本」` : '全部一致'}`)
+    check('docs: INTEGRATION 里没有过时的脚本数', wrongInteg.length === 0,
+      wrongInteg.length ? `还有「${wrongInteg.join('、')}个脚本」` : '全部一致')
+
+    const missingReadme = files.filter(f => !readme.includes(f))
+    check('docs: README 列出每个 bin 脚本', missingReadme.length === 0, missingReadme.join('、') || '全部列出')
+
+    const missingInteg = files.filter(f => !integ.includes(f))
+    check('docs: INTEGRATION 列出每个 bin 脚本', missingInteg.length === 0, missingInteg.join('、') || '全部列出')
+
+    const pkgFiles = pkg.files ?? []
+    const missingPkg = files.filter(f => !pkgFiles.includes(f))
+    check('package: files 覆盖每个 bin（否则 clone 下来缺文件）', missingPkg.length === 0,
+      missingPkg.join('、') || '全部覆盖')
+  }
 } finally {
   await rm(work, { recursive: true, force: true })
 }

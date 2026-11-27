@@ -45,8 +45,14 @@ function findEventFile(dir) {
     .filter(f => f.endsWith('.jsonl.zstd') || f.endsWith('.jsonl'))
     .sort();
   if (!candidates.length) throw new Error(`目录里没有 *.jsonl.zstd: ${dir}`);
-  // 优先带版本号的最新格式
-  const versioned = candidates.filter(f => /\.v\d+\./.test(f)).sort().reverse();
+  // 优先带版本号的最新格式。版本号按数值比较：字符串排序会把 v10 排在 v4 前面。
+  const versionOf = (name) => {
+    const m = name.match(/\.v(\d+)\./);
+    return m ? Number(m[1]) : -1;
+  };
+  const versioned = candidates
+    .filter(f => /\.v\d+\./.test(f))
+    .sort((a, b) => versionOf(b) - versionOf(a));
   return join(dir, (versioned[0] || candidates[0]));
 }
 
@@ -79,6 +85,11 @@ const fmtTime = (ms) => {
   return d.toISOString().replace('T', ' ').slice(0, 16);
 };
 
+// 分隔行是导出文件的骨架：正文里若出现同形文本，会伪造出一轮根本不存在的对话。
+// 只在行首转义，正文照常可读，grep '^===== USER' 仍然只命中真正的轮次边界。
+const escapeBoundaries = (text) =>
+  text.replace(/^(?:=====\s*USER\b|-----\s*YUNO\b)/gm, '\\$&');
+
 const out = [];
 let meta = null;
 let turn = 0;
@@ -92,7 +103,7 @@ for (const o of objs) {
     const body = (o.data?.content || [])
       .filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     if (!body) continue;
-    out.push(`\n===== USER #${turn} · ${fmtTime(o.time)} =====\n${body}`);
+    out.push(`\n===== USER #${turn} · ${fmtTime(o.time)} =====\n${escapeBoundaries(body)}`);
   }
 
   if (o.type === 'assistant/message') {
@@ -108,7 +119,7 @@ for (const o of objs) {
     });
     if (!body && !calls.length) continue;
     out.push(`\n----- YUNO #${turn} · ${fmtTime(o.time)} -----`);
-    if (body) out.push(body);
+    if (body) out.push(escapeBoundaries(body));
     if (calls.length) out.push(calls.join('\n'));
   }
 }

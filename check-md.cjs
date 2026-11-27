@@ -60,9 +60,11 @@ function findYamlRange() {
   const startIdx = lines.findIndex(l => /^[A-Za-z_][\w-]*:\s*$/.test(l) && !l.startsWith(' '));
   if (startIdx < 0) return null;
 
-  // 显式指定结束标记时优先
+  // 显式指定结束标记时优先。整行精确匹配：用 includes 的话，正文里任何含该词的
+  // 句子都会被当成边界，YAML 主体会被从中间切断，而错误被切到检测范围之外。
   if (yamlEndMarker) {
-    const i = lines.findIndex(l => l.includes(yamlEndMarker));
+    const want = yamlEndMarker.trim();
+    const i = lines.findIndex(l => l.trim() === want);
     if (i > startIdx) return { startIdx, endIdx: i };
   }
 

@@ -54,6 +54,8 @@ const TZ = 8 * 3600 * 1000;
 const ts = (ms) => ms ? new Date(ms + TZ).toISOString().slice(5, 16).replace('T', ' ') : '—';
 const kb = (n) => n < 1048576 ? `${(n / 1024).toFixed(0)}KB` : `${(n / 1048576).toFixed(1)}MB`;
 const sid = (r) => r.sd.replace(/^session-/, '').slice(0, 8);
+// 单元格内容：竖线会多切一列，换行会切断整张表，都必须压掉
+const cell = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
 
 // ---------- 扫描 ----------
 const rows = [];
@@ -70,7 +72,11 @@ for (const ws of fs.readdirSync(ROOT)) {
     const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl.zstd') || f.endsWith('.jsonl'));
     if (!files.length) { rows.push({ ws, sd, empty: 1 }); continue; }
 
-    const ver = files.filter(f => /\.v\d+\./.test(f)).sort().reverse();
+    const ver = files.filter(f => /\.v\d+\./.test(f)).sort((a, b) => {
+      // 按数值比较：字符串序会把 v10 排在 v4 前面
+      const n = (name) => Number(name.match(/\.v(\d+)\./)?.[1] ?? -1);
+      return n(b) - n(a);
+    });
     const raw = fs.readFileSync(path.join(dir, ver[0] || files[0]));
 
     let text;
@@ -119,16 +125,18 @@ for (const r of rows) {
 const byTime = (a, b) => (b.l0 || 0) - (a.l0 || 0);
 [main, short, shell].forEach(g => g.sort(byTime));
 
-// 短会话按内容前缀合并，避免刷屏
+// 短会话按内容合并，避免刷屏。用完整标题而不是截断前缀：截断后两条不同的会话会
+// 落进同一个 key；轮数一并进 key，轮数不同本来就不是同一类。
 const groups = new Map();
 for (const r of short) {
-  const k = label(r).slice(0, 26);
-  if (!groups.has(k)) groups.set(k, []);
-  groups.get(k).push(r);
+  const title = label(r);
+  const key = `${title}\u0000${r.turns ?? 0}`;
+  if (!groups.has(key)) groups.set(key, { title, turns: r.turns ?? 0, rows: [] });
+  groups.get(key).rows.push(r);
 }
-const merged = [...groups.entries()]
-  .map(([k, v]) => ({ k, v: v.sort(byTime) }))
-  .sort((a, b) => (b.v[0].l0 || 0) - (a.v[0].l0 || 0));
+const merged = [...groups.values()]
+  .map(g => ({ ...g, rows: g.rows.sort(byTime) }))
+  .sort((a, b) => (b.rows[0].l0 || 0) - (a.rows[0].l0 || 0));
 
 // ---------- 生成 ----------
 const NOW = new Date(Date.now() + TZ).toISOString().slice(0, 16).replace('T', ' ');
@@ -149,18 +157,18 @@ L.push('原始位置：`<根目录>/<workspace>/<session-id>/*.jsonl.zstd`', '')
 L.push('## 主线会话（10 轮以上）', '');
 L.push('| id | 时间跨度 | 轮数 | 大小 | 内容 |', '|---|---|---|---|---|');
 for (const r of main) {
-  L.push(`| \`${sid(r)}\` | ${ts(r.f0)} → ${ts(r.l0)} | ${r.turns} | ${kb(r.size)} | ${label(r).slice(0, 34)} |`);
+  L.push(`| \`${sid(r)}\` | ${ts(r.f0)} → ${ts(r.l0)} | ${r.turns} | ${kb(r.size)} | ${cell(label(r).slice(0, 34))} |`);
 }
 L.push('', '## 短会话', '');
 L.push('| id | 时间 | 轮数 | 大小 | 内容 |', '|---|---|---|---|---|');
-for (const { k, v } of merged) {
+for (const { title, turns, rows: v } of merged) {
   if (v.length > 1) {
     const ids = v.map(x => `\`${sid(x)}\``).join('、');
     const total = v.reduce((a, x) => a + (x.size || 0), 0);
-    L.push(`| ${ids} | ${ts(v[v.length - 1].f0)} | 各 ${v[0].turns} | 合计 ${kb(total)} | ${k}（×${v.length}） |`);
+    L.push(`| ${ids} | ${ts(v[v.length - 1].f0)} | 各 ${turns} | 合计 ${kb(total)} | ${cell(title)}（×${v.length}） |`);
   } else {
     const r = v[0];
-    L.push(`| \`${sid(r)}\` | ${ts(r.f0)} | ${r.turns} | ${kb(r.size)} | ${k} |`);
+    L.push(`| \`${sid(r)}\` | ${ts(r.f0)} | ${r.turns} | ${kb(r.size)} | ${cell(title)} |`);
   }
 }
 L.push('', '## 空壳（无对话）', '');

@@ -2,7 +2,7 @@
 /**
  * run-tests.mjs — dsh-session-tools 的回归测试
  *
- * 三个脚本都不是库，只能当命令跑，所以这里造临时数据、起子进程、读输出断言。
+ * 四个脚本都不是库，只能当命令跑，所以这里造临时数据、起子进程、读输出断言。
  * 每个用例都对应一个曾经出过错的地方：
  *
  *   1. index-sessions: 短会话合并键要带上首问，同标题同轮数的两件事不能合并
@@ -307,6 +307,25 @@ try {
     const missingPkg = files.filter(f => !pkgFiles.includes(f))
     check('package: files 覆盖每个 bin（否则 clone 下来缺文件）', missingPkg.length === 0,
       missingPkg.join('、') || '全部覆盖')
+
+    // package.json 的 description 是别人在 npm/GitHub 上看到的第一句话，
+    // 加功能不更新它，描述就会慢慢变成半真半假。
+    check('package: description 提到搜索功能', /搜索|search/i.test(pkg.description ?? ''),
+      pkg.description ?? '(没有 description)')
+
+    // 上面四条只管「N 个脚本」这个说法，管不到「N 个脚本都不是库」这种散句。
+    // 直接禁止过时表述，新加的文档也会被检查到。
+    // 短语用拼接写，否则这条检查会命中自己的源码（第一次跑就是这样翻车的）
+    const CN3 = '三'
+    const stalePhrases = [`${CN3}个脚本`, `${CN3}个独立`, `${CN3}件 CLI`, `${CN3}个 CLI`]
+    const docFiles = ['README.md', 'INTEGRATION.md', 'CONTRIBUTING.md', 'MAINTENANCE.md', 'test/run-tests.mjs', 'package.json']
+    const staleHits = []
+    for (const f of docFiles) {
+      const text = await readFile(join(root, f), 'utf8').catch(() => '')
+      for (const phrase of stalePhrases) if (text.includes(phrase)) staleHits.push(`${f}: ${phrase}`)
+    }
+    check(`docs: 没有过时的「${CN3}个脚本 / ${CN3}个独立 CLI」表述`, staleHits.length === 0,
+      staleHits.join('；') || '无')
   }
 } finally {
   await rm(work, { recursive: true, force: true })

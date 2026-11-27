@@ -1,7 +1,7 @@
 {
   "name": "@noi258/dsh-session-tools",
   "version": "0.1.0",
-  "description": "DSH 会话工具：把 zstd 事件流导出成可读对话、生成会话索引、校验「YAML 主体 + Markdown 附录」格式的文件",
+  "description": "DSH 会话工具：把 zstd 事件流导出成可读对话、生成会话索引、全文搜索历史对话、校验「YAML 主体 + Markdown 附录」格式的文件",
   "private": true,
   "type": "commonjs",
   "bin": {

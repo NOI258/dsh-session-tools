@@ -87,6 +87,21 @@ YAML_MODULE=/path/to/node_modules/yaml node check-md.cjs AGENTS.md
 
 脚本会依次试 `require('yaml')`、`$YAML_MODULE`、几个全局路径。
 
+## 运行环境
+
+宿主是一台 Android 15 手机（骁龙 4 Gen 2，12 GB 内存 / 256 GB 存储），没有电脑。终端用 Termux，Linux 环境跑在 proot 里。
+
+容器内能查到的（`/proc`、`df` 实测，不是估计）：
+
+- Ubuntu 24.04.5 LTS，aarch64，内核 5.10-gki
+- 8 个核；`/proc/self/status` 的 `TracerPid` 非 0，proot 在跟踪
+- 可见内存 11.1 GiB，根分区 224 GiB（已用 90%）
+- Node v24.22.1、npm 11.19.1
+
+Android 版本、SoC 型号、整机容量在容器里查不到（没有 `getprop`），这部分按机主说明。
+
+三个脚本只用 Node 标准库，`check-md.cjs` 额外需要 `yaml`。这不是硬性要求，只说明「实际验证过的组合」：Node 18+ 理论上都能跑，但只有上面那套是实测过的。
+
 ## 不做的部分
 
 - 不管内容好不好。`check-md.cjs` 只能说文件坏没坏，说不了规则写得对不对。

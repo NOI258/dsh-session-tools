@@ -125,13 +125,15 @@ for (const r of rows) {
 const byTime = (a, b) => (b.l0 || 0) - (a.l0 || 0);
 [main, short, shell].forEach(g => g.sort(byTime));
 
-// 短会话按内容合并，避免刷屏。用完整标题而不是截断前缀：截断后两条不同的会话会
-// 落进同一个 key；轮数一并进 key，轮数不同本来就不是同一类。
+// 短会话按内容合并，避免刷屏。key 用「完整标题 + 轮数 + 首问」三项：
+// 只用标题会让同名对话挤进一行；只加轮数仍会合并「同名同轮数、问的是两件事」的会话。
 const groups = new Map();
 for (const r of short) {
   const title = label(r);
-  const key = `${title}\u0000${r.turns ?? 0}`;
-  if (!groups.has(key)) groups.set(key, { title, turns: r.turns ?? 0, rows: [] });
+  const turns = r.turns ?? 0;
+  const first = r.q ?? '';
+  const key = [title, turns, first].join('\u0000');
+  if (!groups.has(key)) groups.set(key, { title, turns, rows: [] });
   groups.get(key).rows.push(r);
 }
 const merged = [...groups.values()]

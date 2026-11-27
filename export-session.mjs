@@ -90,6 +90,17 @@ const fmtTime = (ms) => {
 const escapeBoundaries = (text) =>
   text.replace(/^(?:=====\s*USER\b|-----\s*YUNO\b)/gm, '\\$&');
 
+// 每条正文单独放进一个围栏块，围栏长度按内容动态选：比正文里最长的反引号串再长一个。
+// 否则一段没闭合的 ``` 会把后面所有轮次吞进同一个代码块，导出文件结构就废了。
+const fenceFor = (text) => {
+  const longest = (text.match(/`+/g) ?? []).reduce((max, run) => Math.max(max, run.length), 0);
+  return '`'.repeat(Math.max(3, longest + 1));
+};
+const fencedBlock = (text) => {
+  const fence = fenceFor(text);
+  return `${fence}markdown\n${escapeBoundaries(text)}\n${fence}`;
+};
+
 const out = [];
 let meta = null;
 let turn = 0;
@@ -103,7 +114,7 @@ for (const o of objs) {
     const body = (o.data?.content || [])
       .filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     if (!body) continue;
-    out.push(`\n===== USER #${turn} · ${fmtTime(o.time)} =====\n${escapeBoundaries(body)}`);
+    out.push(`\n===== USER #${turn} · ${fmtTime(o.time)} =====\n${fencedBlock(body)}`);
   }
 
   if (o.type === 'assistant/message') {
@@ -119,7 +130,7 @@ for (const o of objs) {
     });
     if (!body && !calls.length) continue;
     out.push(`\n----- YUNO #${turn} · ${fmtTime(o.time)} -----`);
-    if (body) out.push(escapeBoundaries(body));
+    if (body) out.push(fencedBlock(body));
     if (calls.length) out.push(calls.join('\n'));
   }
 }

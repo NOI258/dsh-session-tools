@@ -62,10 +62,19 @@ function findYamlRange() {
 
   // 显式指定结束标记时优先。整行精确匹配：用 includes 的话，正文里任何含该词的
   // 句子都会被当成边界，YAML 主体会被从中间切断，而错误被切到检测范围之外。
+  //
+  // 显式指定了却找不到时不能悄悄回退到默认规则：回退意味着这份文件的分段和你要求的
+  // 不是一回事，后面的检查全部建立在一个没人同意的切法上。这里直接报错。
   if (yamlEndMarker) {
     const want = yamlEndMarker.trim();
     const i = lines.findIndex(l => l.trim() === want);
-    if (i > startIdx) return { startIdx, endIdx: i };
+    if (i < 0) {
+      return { error: `显式结束标记「${yamlEndMarker}」未找到：${lines.length} 行里没有整行匹配` };
+    }
+    if (i <= startIdx) {
+      return { error: `显式结束标记「${yamlEndMarker}」在第 ${i + 1} 行，早于 YAML 起点的第 ${startIdx + 1} 行` };
+    }
+    return { startIdx, endIdx: i };
   }
 
   // 默认：只认「显式结束标记」，不认「非法行」
@@ -91,6 +100,8 @@ const warn = (n, d) => add('WARN', n, d);
 const range = findYamlRange();
 if (!range) {
   fail('分段', '找不到 YAML 主体起点（期望第一行顶层 key，如 `name:`）');
+} else if (range.error) {
+  fail('分段', range.error);
 } else {
   const { startIdx, endIdx } = range;
   pass('分段', `YAML 主体 第 ${startIdx + 1}–${endIdx} 行；Markdown 区 第 ${endIdx + 1} 行起`);

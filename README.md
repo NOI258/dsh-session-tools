@@ -8,6 +8,8 @@ DSH 把每个会话存成 zstd 压缩的 JSONL 事件流，扔在 `~/.dsh/sessio
 - `export-session.mjs` — 把事件流导出成能读的对话
 - `check-md.cjs` — 改完配置文件确认没改坏
 
+改这个仓库之前先看 [MAINTENANCE.md](./MAINTENANCE.md)：分支怎么推、测试怎么验、哪些坑已经踩过。
+
 ---
 
 ## index-sessions.cjs

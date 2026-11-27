@@ -1,12 +1,15 @@
 # dsh-session-tools
 
+> 最后更新：2026-11-27
+
 DSH 把每个会话存成 zstd 压缩的 JSONL 事件流，扔在 `~/.dsh/sessions/` 下，没有查看工具。
 
-所以我写了三个脚本。
+所以我写了四个脚本。
 
 - `index-sessions.cjs` — 几十个会话里找哪个是哪个
 - `export-session.mjs` — 把事件流导出成能读的对话
 - `check-md.cjs` — 改完配置文件确认没改坏
+- `search-sessions.mjs` — 搜「我上次是不是说过那个」
 
 改这个仓库之前先看 [MAINTENANCE.md](./MAINTENANCE.md)：分支怎么推、测试怎么验、哪些坑已经踩过。
 
@@ -97,7 +100,7 @@ node search-sessions.mjs --sessions=~/.dsh/sessions "两个词" --json
 
 ## 装
 
-**不发布 npm。** 三个脚本零构建，clone 下来直接跑：
+**不发布 npm。** 四个脚本零构建，clone 下来直接跑：
 
 ```bash
 git clone https://github.com/NOI258/dsh-session-tools
@@ -134,7 +137,7 @@ YAML_MODULE=/path/to/node_modules/yaml node check-md.cjs AGENTS.md
 
 容器里没有 `getprop`，所以上面这些是机主说明 + 手机端实测补的（2026-11-27）：`ro.product.model=V2444A`、`ro.product.device=PD2444`、`ro.build.version.release=15`、`ro.board.platform=parrot`。
 
-三个脚本只用 Node 标准库，`check-md.cjs` 额外需要 `yaml`。这不是硬性要求，只说明「实际验证过的组合」：Node 18+ 理论上都能跑，但只有上面那套是实测过的。
+四个脚本只用 Node 标准库，`check-md.cjs` 额外需要 `yaml`。这不是硬性要求，只说明「实际验证过的组合」：Node 18+ 理论上都能跑，但只有上面那套是实测过的。
 
 ## 不足
 

@@ -64,7 +64,7 @@ git ls-remote "https://x-access-token:${TOKEN}@github.com/NOI258/dsh-session-too
 node test/run-tests.mjs      # 25 项；exit 0 = 全过，1 = 有失败
 ```
 
-三个脚本都不是库，只能当命令跑，所以测试是「造临时数据 → 起子进程 → 读输出断言」。临时目录在 `/tmp/dst-test-*`，跑完自动删。
+四个脚本都不是库，只能当命令跑，所以测试是「造临时数据 → 起子进程 → 读输出断言」。临时目录在 `/tmp/dst-test-*`，跑完自动删。
 
 | 用例 | 断言数量 | 防的是哪个曾经出过的错 |
 |---|---|---|

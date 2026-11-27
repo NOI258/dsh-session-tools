@@ -1,12 +1,14 @@
 # 集成说明（给 DSH agent 读）
 
+> 最后更新：2026-11-27
+
 人看的介绍在 [`README.md`](./README.md)，维护细节在 [`MAINTENANCE.md`](./MAINTENANCE.md)。这份只讲**怎么用、怎么验证、哪些坑会坑到你**。
 
 ---
 
 ## 0. 先确认一件事：这不是插件
 
-本仓库是**三个独立 CLI 脚本**，没有 `cordis.patch.yml`，不注册任何工具。
+本仓库是**四个独立 CLI 脚本**，没有 `cordis.patch.yml`，不注册任何工具。
 
 - ❌ 不要 `dsh plugin add` 这个仓库——加了也不会出现工具
 - ❌ 不要 `npm i` 这个仓库——没有发布 npm（`package.json` 里 `private: true`）
@@ -16,13 +18,14 @@
 
 ---
 
-## 1. 三个脚本
+## 1. 四个脚本
 
 | 脚本 | 干什么 | 输出 |
 |---|---|---|
 | `export-session.mjs` | 把 DSH 会话的 zstd 事件流导出成可读 markdown | 一个 `.md` 文件 |
 | `index-sessions.cjs` | 扫会话目录，生成 `INDEX.md` 总表 | 一个 `INDEX.md` |
 | `check-md.cjs` | 校验「YAML 主体 + Markdown 附录」格式的文件 | 终端报告 |
+| `search-sessions.mjs` | 在全部会话里搜关键词（消息级 AND，带缓存） | 终端命中行 / JSON |
 
 ### 调用方式
 

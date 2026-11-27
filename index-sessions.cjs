@@ -10,6 +10,11 @@
  *
  * 默认根目录: $DSH_HOME/sessions 或 ~/.dsh/sessions
  * 默认输出:   <根目录>/INDEX.md
+ *
+ * ⚠️ 本机还有一份分叉副本 ~/.dsh/sessions/scan-sessions.cjs，日常实际用的是它。
+ * 两份不是同一个文件、互不引用，改了一边要同步另一边，否则同一个会话会在
+ * INDEX 和导出里显示不同的轮数（2026-11-27 踩过）。那份独有的功能：
+ * 硬编码 TOPIC、当前会话标记、项目分片 / 自动化分类。
  */
 'use strict';
 
@@ -20,7 +25,8 @@ const zlib = require('zlib');
 
 // ---------- 参数 ----------
 const args = process.argv.slice(2);
-const outFlag = args.find(a => a.startsWith('--out='));
+const OUT_PREFIX = '--out=';
+const outFlag = args.find(a => a.startsWith(OUT_PREFIX));
 const positional = args.filter(a => !a.startsWith('--'));
 
 const ROOT = positional[0]
@@ -31,7 +37,13 @@ if (!fs.existsSync(ROOT)) {
   console.error(`会话根目录不存在: ${ROOT}`);
   process.exit(2);
 }
-const OUT = outFlag ? outFlag.split('=')[1] : path.join(ROOT, 'INDEX.md');
+// slice 而非 split('=')[1]：路径里带等号时 split 会把后半截连同文件名一起丢掉，
+// 结果文件被写到别的名字上，还不报错。
+const OUT = outFlag ? outFlag.slice(OUT_PREFIX.length) : path.join(ROOT, 'INDEX.md');
+if (outFlag && !OUT.trim()) {
+  console.error('--out= 后面是空的。要么给出路径，要么去掉这个参数。');
+  process.exit(2);
+}
 
 // ---------- zstd ----------
 const M = 0x28b52ffd, SKIP = 0x184d2a50, MASK = 0xfffffff0;
@@ -69,7 +81,10 @@ for (const ws of fs.readdirSync(ROOT)) {
     let st; try { st = fs.statSync(dir); } catch { continue; }
     if (!st.isDirectory()) continue;
 
-    const files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl.zstd') || f.endsWith('.jsonl'));
+    // 单个子目录读不了不该让整次扫描崩掉，标记成错误行继续
+    let files;
+    try { files = fs.readdirSync(dir).filter(f => f.endsWith('.jsonl.zstd') || f.endsWith('.jsonl')); }
+    catch (e) { rows.push({ ws, sd, err: `目录读取失败: ${e.message}` }); continue; }
     if (!files.length) { rows.push({ ws, sd, empty: 1 }); continue; }
 
     const ver = files.filter(f => /\.v\d+\./.test(f)).sort((a, b) => {
@@ -95,11 +110,13 @@ for (const ws of fs.readdirSync(ROOT)) {
         title = typeof d === 'string' ? d : (d?.title || null);
       }
       if (o.type === 'user/message' && o.data?.source?.kind === 'user') {
+        const s = (o.data.content || [])
+          .filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
+        // 只统计有正文的轮次。口径必须和 export-session 一致：那边空正文用户消息
+        // 不占轮号，这里若还照旧自增，同一会话会出现 INDEX 写 25 轮、导出写 23 轮。
+        if (!s) continue;
         turns++;
-        if (!q) {
-          const s = (o.data.content || []).filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
-          if (s) q = s.replace(/\s+/g, ' ').slice(0, 60);
-        }
+        if (!q) q = s.replace(/\s+/g, ' ').slice(0, 60);
       }
     }
     rows.push({ ws, sd, size: raw.length, events: objs.length, turns, f0, l0, title, q });

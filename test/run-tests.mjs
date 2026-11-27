@@ -155,6 +155,76 @@ try {
     check('check-md: 错误里点明是哪个标记', missing.out.includes('NO_SUCH_MARKER'), '')
     check('check-md: 不再静默回退到默认规则', !/YAML 解析/.test(missing.out), missing.out.includes('YAML 解析') ? '仍然继续解析了' : '没有继续解析')
   }
+
+  // ---------- 5. check-md 的边界写法 ----------
+  // 这些格式都合法，但旧实现认不出来：认不出时要么报假错，要么静默跳过检查。
+  {
+    const valued = join(work, 'valued.md')
+    await writeFile(valued, 'name: demo\nversion: 1\n---\n# md\n')
+    const r1 = run(checkScript, [valued])
+    const seg = r1.out.split('\n').find(l => l.includes('分段')) ?? '(没有分段行)'
+    check('check-md: 顶层键带值时有 YAML 起点', /\[PASS\] 分段/.test(r1.out) && r1.code === 0, seg)
+
+    // 空值的 --yaml-end= 是写错了，不能当成没传
+    const basic = join(work, 'basic.md')
+    await writeFile(basic, 'name:\n---\n# md\n')
+    const r2 = run(checkScript, [basic, '--yaml-end='])
+    check('check-md: --yaml-end= 空值报用法错误', r2.code === 2 && /空的/.test(r2.out),
+      `exit ${r2.code} / ${r2.out.trim().split('\n')[0] || '(无输出)'}`)
+
+    // CRLF：yaml 代码块必须还能被找到并检查
+    const crlf = join(work, 'crlf.md')
+    await writeFile(crlf, 'name:\r\n---\r\n# md\r\n```yaml\r\na: 1\r\n```\r\n')
+    const r3 = run(checkScript, [crlf])
+    const blockLine = r3.out.split('\n').find(l => l.includes('代码块')) ?? '(没有代码块行)'
+    check('check-md: CRLF 文件里的 yaml 块仍被检查', /\[PASS\] 代码块: 1 块/.test(r3.out), blockLine)
+
+    // 层号不一定从 1 开始
+    const lv0 = join(work, 'lv0.md')
+    await writeFile(lv0, 'name:\nlayer_order:\n  layers:\n    - level: 0\n    - level: 1\n    - level: 2\n---\n# md\n')
+    const r4 = run(checkScript, [lv0])
+    const contLine = r4.out.split('\n').find(l => l.includes('层表连续性')) ?? '(没有该行)'
+    check('check-md: 层表 0,1,2 判为连续', /\[PASS\] 层表连续性/.test(r4.out), contLine)
+
+    // 结束标记本身含等号
+    const eq = join(work, 'eq.md')
+    await writeFile(eq, 'name:\nA=B\n---\n# md\n')
+    const r5 = run(checkScript, [eq, '--yaml-end=A=B'])
+    const eqSeg = r5.out.split('\n').find(l => l.includes('分段')) ?? '(没有分段行)'
+    check('check-md: 结束标记含等号不被截断', r5.code === 0 && /\[PASS\] 分段/.test(r5.out), eqSeg)
+  }
+
+  // ---------- 6. index-sessions 的边界写法 ----------
+  // 同一份会话数据，INDEX 的轮数和 export 的轮数必须是同一个数。
+  {
+    const sessions = join(work, 'sessions6')
+    const sdir = join(sessions, 'ws', 'session-fff00006')
+    await mkdir(sdir, { recursive: true })
+    const now = Date.now()
+    const ev = [
+      { type: 'session', createdAt: now - 1000, cwd: '/root/workspace' },
+      { type: 'session/title', time: now - 900, data: { title: 'edge title' } },
+      { type: 'user/message', time: now - 800, data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'q1' }] } },
+      { type: 'assistant/message', time: now - 700, data: { message: { content: [{ type: 'text', text: 'a1' }] } } },
+      // 空正文用户消息：不占轮号
+      { type: 'user/message', time: now - 600, data: { source: { kind: 'user' }, content: [] } },
+      { type: 'user/message', time: now - 500, data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'q2' }] } },
+    ]
+    await writeFile(join(sdir, 'session.v4.jsonl.zstd'),
+      zstdCompressSync(Buffer.from(ev.map(e => JSON.stringify(e)).join('\n') + '\n')))
+
+    // 输出路径含等号：split('=') 会把它截断成另一个文件
+    const out = join(work, 'out=a', 'INDEX.md')
+    await mkdir(dirname(out), { recursive: true })
+    const r = run(indexScript, [sessions, `--out=${out}`])
+    const md = await readFile(out, 'utf8').catch(() => '')
+    check('index: --out 路径含等号时写到正确位置', r.code === 0 && md.length > 0,
+      `exit ${r.code}，目标文件${md ? '存在' : '不存在'}`)
+
+    const row = (md.split('## 短会话')[1] ?? '').split('\n').find(l => l.startsWith('| `'))
+    const turns = row ? row.split('|')[3].trim() : '(没找到数据行)'
+    check('index: 轮数不计空正文用户消息', turns === '2', `轮数: ${turns}（应为 2）`)
+  }
 } finally {
   await rm(work, { recursive: true, force: true })
 }

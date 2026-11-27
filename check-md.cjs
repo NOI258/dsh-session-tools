@@ -18,11 +18,20 @@ const fs = require('fs');
 // ---------- 参数 ----------
 const args = process.argv.slice(2);
 const target = args.find(a => !a.startsWith('--'));
-const endFlag = args.find(a => a.startsWith('--yaml-end='));
-const yamlEndMarker = endFlag ? endFlag.split('=')[1] : null;
+const END_PREFIX = '--yaml-end=';
+const endFlag = args.find(a => a.startsWith(END_PREFIX));
+// 用 slice 而不是 split('=')[1]：标记本身可能含等号（A=B），split 会把后半截丢掉，
+// 于是报「A 未找到」——错误信息指向一个用户从没写过的标记。
+const yamlEndMarker = endFlag ? endFlag.slice(END_PREFIX.length) : null;
 
 if (!target) {
   console.error('用法: node check-md.cjs <文件路径> [--yaml-end=<结束标记>]');
+  process.exit(2);
+}
+// 传了 --yaml-end= 却是空值：这不是「没指定」，是写错了。静默回退到默认规则
+// 会让整份检查建立在一个没人要求的切法上。
+if (endFlag && !yamlEndMarker.trim()) {
+  console.error('--yaml-end= 后面是空的。要么给出标记，要么去掉这个参数。');
   process.exit(2);
 }
 if (!fs.existsSync(target)) {
@@ -52,12 +61,14 @@ if (!YAML) {
 }
 
 // ---------- 读文件与分段 ----------
-const src = fs.readFileSync(target, 'utf8');
+const src = fs.readFileSync(target, 'utf8').replace(/\r\n?/g, '\n');
 const lines = src.split('\n');
 
 // YAML 主体：从第一个以 `key:` 开头的行开始，到第一个独立 `---` 行（或结束标记）为止
 function findYamlRange() {
-  const startIdx = lines.findIndex(l => /^[A-Za-z_][\w-]*:\s*$/.test(l) && !l.startsWith(' '));
+  // 顶层键不一定写成 `name:`（冒号后为空），`name: demo` 一样合法。
+  // 只认冒号后为空会把带值的文件全部判成「找不到 YAML 主体」。
+  const startIdx = lines.findIndex(l => /^[A-Za-z_][\w-]*:(\s|$)/.test(l) && !l.startsWith(' '));
   if (startIdx < 0) return null;
 
   // 显式指定结束标记时优先。整行精确匹配：用 includes 的话，正文里任何含该词的
@@ -112,7 +123,12 @@ if (!range) {
   let doc = null;
   try {
     doc = YAML.parse(body, { uniqueKeys: true });
-    pass('YAML 解析', `${Object.keys(doc).length} 个顶层键，无重复键`);
+    // 只有注释的 YAML 主体会解析成 null，这是合法结果，不是解析失败。
+    if (doc === null || typeof doc !== 'object') {
+      pass('YAML 解析', '解析成空文档（只有注释或空行？）');
+    } else {
+      pass('YAML 解析', `${Object.keys(doc).length} 个顶层键，无重复键`);
+    }
   } catch (e) {
     fail('YAML 解析', String(e.message).split('\n')[0]);
   }
@@ -156,11 +172,14 @@ if (!range) {
     const sorted = [...levels].sort((a, b) => a - b);
     const asc = JSON.stringify(levels) === JSON.stringify(sorted);
     const uniq = levels.length === new Set(levels).size;
-    const contiguous = levels.every((_, i) => levels.includes(i + 1));
+    // 连续性按排序后相邻差判，不假设层号从 1 开始：
+    // 0,1,2 是连续的，旧写法用 includes(i+1) 会判成「有空档」。
+    const contiguous = sorted.every((v, i) => i === 0 || v === sorted[i - 1] + 1);
+    const span = levels.length ? `${sorted[0]}–${sorted[sorted.length - 1]}` : '—';
 
     asc ? pass('层表顺序', '升序') : fail('层表顺序', `乱序: ${levels.join(',')}`);
     uniq ? pass('层表唯一性', '无重复') : fail('层表唯一性', `重复: ${levels}`);
-    contiguous ? pass('层表连续性', `1–${Math.max(...levels)} 无空档`) : warn('层表连续性', `有空档: ${levels.join(',')}`);
+    contiguous ? pass('层表连续性', `${span} 无空档`) : warn('层表连续性', `有空档: ${levels.join(',')}`);
   }
 }
 

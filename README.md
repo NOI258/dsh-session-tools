@@ -78,19 +78,18 @@ node check-md.cjs AGENTS.md --yaml-end=END_OF_CONFIG
 
 ## 装
 
-从 npm（发布后）：
-
-```bash
-npm i -g @noi258/dsh-session-tools
-# 三个命令：dsh-export-session / dsh-index-sessions / dsh-check-md
-```
-
-或者直接 clone：
+**不发布 npm。** 三个脚本零构建，clone 下来直接跑：
 
 ```bash
 git clone https://github.com/NOI258/dsh-session-tools
-cd dsh-session-tools && node test/run-tests.mjs
+cd dsh-session-tools
+node test/run-tests.mjs          # 先确认基线是绿的
+node export-session.mjs <会话目录>
 ```
+
+想长期放在 DSH 环境里用，把这个目录扔进工作区就行——它们是纯 CLI，
+适合让 DSH agent 直接调：导出会话、重建索引、校验配置这类活本来就该排队交给它做。
+`package.json` 只为本地 `npm pack` 和 bin 定义存在，`private` 已设为 true，防止误发。
 
 Node 18+。前两个零依赖。
 

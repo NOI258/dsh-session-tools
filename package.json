@@ -15,7 +15,8 @@
     "check-md.cjs",
     "README.md",
     "MAINTENANCE.md",
-    "LICENSE"
+    "LICENSE",
+    "test/run-tests.mjs"
   ],
   "engines": {
     "node": ">=18"

@@ -52,7 +52,7 @@ git ls-remote "https://x-access-token:${TOKEN}@github.com/NOI258/dsh-session-too
 6. commit → 推 `master` → FF `main`
 7. **拿真实数据复核一次**，别只用造出来的样本
 
-第 4 步别省。测试全绿只能说明「没坏」，说明不了「测到了」。这套测试真实踩过：反向验证时 3 项 FAIL，恢复后 18/18。
+第 4 步别省。测试全绿只能说明「没坏」，说明不了「测到了」。这套测试真实踩过：反向验证时 3 项 FAIL，恢复后全绿（当时 18 项，现在已增至 40 项）。
 
 第 7 步也别省。造的数据往往太干净——轮数那次的 bug 在合成样本里不出现，是拿真实会话（`ce81bd26`）跑出来才暴露的。
 
@@ -61,7 +61,7 @@ git ls-remote "https://x-access-token:${TOKEN}@github.com/NOI258/dsh-session-too
 ## 三、测试
 
 ```bash
-node test/run-tests.mjs      # 25 项；exit 0 = 全过，1 = 有失败
+node test/run-tests.mjs      # exit 0 = 全过，1 = 有失败；最后一行打印检查总数
 ```
 
 四个脚本都不是库，只能当命令跑，所以测试是「造临时数据 → 起子进程 → 读输出断言」。临时目录在 `/tmp/dst-test-*`，跑完自动删。

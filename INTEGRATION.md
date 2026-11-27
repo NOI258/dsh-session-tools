@@ -87,7 +87,7 @@ node /root/workspace/dsh-session-tools/check-md.cjs <文件路径> [--yaml-end=<
 cd /root/workspace/dsh-session-tools && node test/run-tests.mjs; echo "exit=$?"
 ```
 
-25 项检查。**全过说明脚本本身没坏**，问题在参数、路径或数据上。
+所有检查项通过（数量看脚本最后一行输出的总数）。**全过说明脚本本身没坏**，问题在参数、路径或数据上。
 
 这台机器上还实用地跑过一次真实数据复核：
 
